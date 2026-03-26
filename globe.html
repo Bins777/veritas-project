@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Financial Network Globe — Veritas Project</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; overflow:hidden; width:100vw; height:100vh; }
+  canvas { display:block; }
+  #loading {
+    position:fixed; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    background:#000; z-index:100; transition:opacity 0.7s;
+  }
+  #loading-text { font-family:monospace; font-size:12px; letter-spacing:0.28em; color:rgba(255,255,255,0.3); }
+  #loading-bar-wrap { width:140px; height:1px; background:rgba(255,255,255,0.08); }
+  #loading-bar { height:1px; width:0%; background:rgba(255,255,255,0.45); transition:width 0.4s; }
+  #legend {
+    position:fixed; bottom:20px; left:20px;
+    font-family:monospace; font-size:12px; letter-spacing:0.12em;
+    color:rgba(255,255,255,0.25); display:flex; flex-direction:column; gap:8px; pointer-events:none;
+    max-width:320px;
+  }
+  .legend-row { display:flex; align-items:center; gap:10px; }
+  .legend-line { width:28px; height:2px; flex-shrink:0; }
+  #hint {
+    position:fixed; bottom:20px; right:20px;
+    font-family:monospace; font-size:11px; letter-spacing:0.15em;
+    color:rgba(255,255,255,0.15); pointer-events:none; text-align:right; line-height:1.8;
+  }
+  #source-credit {
+    position:fixed; top:16px; right:16px;
+    font-family:monospace; font-size:9.5px; letter-spacing:0.12em;
+    color:rgba(255,255,255,0.22); pointer-events:none;
+    text-align:right; line-height:1.8;
+    background:rgba(0,0,0,0.45); padding:8px 14px;
+    border:1px solid rgba(255,255,255,0.08);
+  }
+  #back-btn {
+    position:fixed; top:16px; left:16px; z-index:999;
+    font-family:monospace; font-size:10px; letter-spacing:0.22em; text-transform:uppercase;
+    background:rgba(0,0,0,0.75); border:1px solid rgba(255,255,255,0.15);
+    color:rgba(255,255,255,0.6); text-decoration:none;
+    padding:10px 18px; display:inline-flex; align-items:center; gap:8px;
+    transition:border-color 0.2s, color 0.2s;
+  }
+  #back-btn:hover { border-color:rgba(192,57,43,0.6); color:rgba(192,57,43,0.9); }
+</style>
+</head>
+<body>
+
+<div id="source-credit">
+  Sumber: International Consortium of Investigative Journalists (ICIJ)<br>
+  Panama Papers &amp; Offshore Leaks Database
+</div>
+
+<a id="back-btn" href="veritas_dashboard.html">← Kembali ke Dashboard</a>
+
+<div id="loading">
+  <div id="loading-text">LOADING WORLD DATA</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+</div>
+<div id="legend">
+  <div class="legend-row"><div class="legend-line" style="background:rgba(255,255,255,0.35)"></div><span>Jaringan keuangan global</span></div>
+  <div class="legend-row"><div class="legend-line" style="background:rgba(220,40,40,0.85)"></div><span>Rute Shell Companies di Indonesia dari kasus Panama Papers</span></div>
+</div>
+<div id="hint">SERET UNTUK MEMUTAR<br>CUBIT UNTUK ZOOM</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+
+const CITIES = [
+  { lat:40.71,  lng:-74.01, city:"New York",        country:"USA" },
+  { lat:51.51,  lng:-0.13,  city:"London",           country:"UK" },
+  { lat:35.68,  lng:139.69, city:"Tokyo",            country:"Japan" },
+  { lat:22.32,  lng:114.17, city:"Hong Kong",        country:"China SAR" },
+  { lat:1.35,   lng:103.82, city:"Singapore",        country:"Singapore" },
+  { lat:31.23,  lng:121.47, city:"Shanghai",         country:"China" },
+  { lat:50.11,  lng:8.68,   city:"Frankfurt",        country:"Germany" },
+  { lat:48.85,  lng:2.35,   city:"Paris",            country:"France" },
+  { lat:47.38,  lng:8.54,   city:"Zurich",           country:"Switzerland" },
+  { lat:46.20,  lng:6.15,   city:"Geneva",           country:"Switzerland" },
+  { lat:52.37,  lng:4.90,   city:"Amsterdam",        country:"Netherlands" },
+  { lat:25.20,  lng:55.27,  city:"Dubai",            country:"UAE" },
+  { lat:-33.87, lng:151.21, city:"Sydney",           country:"Australia" },
+  { lat:43.65,  lng:-79.38, city:"Toronto",          country:"Canada" },
+  { lat:41.88,  lng:-87.63, city:"Chicago",          country:"USA" },
+  { lat:37.57,  lng:126.98, city:"Seoul",            country:"South Korea" },
+  { lat:19.08,  lng:72.88,  city:"Mumbai",           country:"India" },
+  { lat:55.75,  lng:37.62,  city:"Moscow",           country:"Russia" },
+  { lat:59.33,  lng:18.07,  city:"Stockholm",        country:"Sweden" },
+  { lat:45.46,  lng:9.19,   city:"Milan",            country:"Italy" },
+  { lat:40.42,  lng:-3.70,  city:"Madrid",           country:"Spain" },
+  { lat:50.85,  lng:4.35,   city:"Brussels",         country:"Belgium" },
+  { lat:48.21,  lng:16.37,  city:"Vienna",           country:"Austria" },
+  { lat:3.14,   lng:101.69, city:"Kuala Lumpur",     country:"Malaysia" },
+  { lat:-6.21,  lng:106.85, city:"Jakarta",          country:"Indonesia" },
+  { lat:13.75,  lng:100.52, city:"Bangkok",          country:"Thailand" },
+  { lat:22.54,  lng:114.06, city:"Shenzhen",         country:"China" },
+  { lat:25.76,  lng:-80.19, city:"Miami",            country:"USA" },
+  { lat:49.61,  lng:6.13,   city:"Luxembourg",       country:"Luxembourg" },
+  { lat:43.73,  lng:7.42,   city:"Monaco",           country:"Monaco" },
+  { lat:39.91,  lng:116.39, city:"Beijing",          country:"China" },
+  { lat:55.68,  lng:12.57,  city:"Copenhagen",       country:"Denmark" },
+  { lat:60.17,  lng:24.94,  city:"Helsinki",         country:"Finland" },
+  { lat:-23.55, lng:-46.63, city:"São Paulo",        country:"Brazil" },
+  { lat:19.43,  lng:-99.13, city:"Mexico City",      country:"Mexico" },
+  { lat:8.99,   lng:-79.52, city:"Panama City",      country:"Panama" },
+  { lat:-34.60, lng:-58.38, city:"Buenos Aires",     country:"Argentina" },
+  { lat:-12.05, lng:-77.04, city:"Lima",             country:"Peru" },
+  { lat:4.71,   lng:-74.07, city:"Bogotá",           country:"Colombia" },
+  { lat:-33.46, lng:-70.65, city:"Santiago",         country:"Chile" },
+  { lat:10.49,  lng:-66.88, city:"Caracas",          country:"Venezuela" },
+  { lat:-15.78, lng:-47.93, city:"Brasília",         country:"Brazil" },
+  { lat:-25.29, lng:-57.65, city:"Asunción",         country:"Paraguay" },
+  { lat:-0.23,  lng:-78.52, city:"Quito",            country:"Ecuador" },
+  { lat:24.68,  lng:46.72,  city:"Riyadh",           country:"Saudi Arabia" },
+  { lat:24.45,  lng:54.37,  city:"Abu Dhabi",        country:"UAE" },
+  { lat:25.28,  lng:51.53,  city:"Doha",             country:"Qatar" },
+  { lat:29.37,  lng:47.98,  city:"Kuwait City",      country:"Kuwait" },
+  { lat:26.22,  lng:50.59,  city:"Manama",           country:"Bahrain" },
+  { lat:23.61,  lng:58.59,  city:"Muscat",           country:"Oman" },
+  { lat:31.95,  lng:35.93,  city:"Amman",            country:"Jordan" },
+  { lat:33.89,  lng:35.50,  city:"Beirut",           country:"Lebanon" },
+  { lat:30.04,  lng:31.24,  city:"Cairo",            country:"Egypt" },
+  { lat:36.82,  lng:10.18,  city:"Tunis",            country:"Tunisia" },
+  { lat:36.74,  lng:3.06,   city:"Algiers",          country:"Algeria" },
+  { lat:34.02,  lng:-6.83,  city:"Rabat",            country:"Morocco" },
+  { lat:32.90,  lng:13.18,  city:"Tripoli",          country:"Libya" },
+  { lat:33.51,  lng:36.29,  city:"Damascus",         country:"Syria" },
+  { lat:15.55,  lng:32.53,  city:"Khartoum",         country:"Sudan" },
+  { lat:15.35,  lng:44.21,  city:"Sana'a",           country:"Yemen" },
+  { lat:2.04,   lng:45.34,  city:"Mogadishu",        country:"Somalia" },
+  { lat:12.36,  lng:43.15,  city:"Djibouti",         country:"Djibouti" },
+  { lat:19.31,  lng:-81.25, city:"George Town",      country:"Cayman Islands" },
+  { lat:18.42,  lng:-64.64, city:"Road Town",        country:"Brit. Virgin Is." },
+  { lat:32.30,  lng:-64.78, city:"Hamilton",         country:"Bermuda" },
+  { lat:25.05,  lng:-77.34, city:"Nassau",           country:"Bahamas" },
+  { lat:35.17,  lng:33.36,  city:"Nicosia",          country:"Cyprus" },
+  { lat:35.90,  lng:14.51,  city:"Valletta",         country:"Malta" },
+  { lat:49.19,  lng:-2.11,  city:"St. Helier",       country:"Jersey" },
+  { lat:47.14,  lng:9.52,   city:"Vaduz",            country:"Liechtenstein" },
+  { lat:-20.16, lng:57.50,  city:"Port Louis",       country:"Mauritius" },
+  { lat:12.52,  lng:-69.97, city:"Oranjestad",       country:"Aruba" },
+  { lat:-13.83, lng:-172.14,city:"Apia",             country:"Samoa" },
+  { lat:-21.14, lng:-159.77,city:"Avarua",           country:"Cook Islands" },
+  { lat:-4.68,  lng:55.49,  city:"Victoria",         country:"Seychelles" },
+  { lat:-19.05, lng:-169.91,city:"Alofi",            country:"Niue" },
+];
+
+const CONNECTIONS = [
+  [0,1],[0,13],[0,14],[0,27],[0,7],[0,33],[0,34],
+  [0,62],[0,63],[0,64],[0,65],[0,71],
+  [1,6],[1,8],[1,10],[1,21],[1,19],[1,66],[1,67],[1,68],[1,11],[1,7],
+  [2,3],[2,15],[2,26],[2,30],[2,5],
+  [3,4],[3,5],[3,26],[3,62],[3,30],
+  [5,30],[5,26],
+  [4,23],[4,24],[4,25],[4,12],[4,70],[4,16],[4,3],[4,74],[4,72],
+  [6,10],[6,21],[6,22],[6,28],[6,8],
+  [7,10],[7,19],[7,20],[7,28],[7,29],
+  [8,9],[8,28],[8,69],[8,29],[8,19],
+  [9,69],[9,28],[9,29],
+  [10,21],[10,28],[10,31],
+  [19,29],[19,67],[19,66],
+  [20,7],[20,35],
+  [21,28],[28,69],[28,68],[68,64],
+  [11,16],[11,4],[11,70],[11,66],[11,44],[11,45],[11,46],[11,47],[11,48],[11,49],
+  [11,52],[11,51],[11,50],
+  [44,45],[44,46],[44,47],[44,48],[44,49],
+  [45,46],[46,47],[47,48],[48,49],
+  [50,51],[50,52],[51,52],[51,54],[52,53],[53,54],[54,55],[55,56],[56,57],
+  [44,1],[44,8],[46,1],[46,8],[51,1],[51,7],[54,7],[55,7],
+  [44,66],[44,68],[46,66],[11,68],[11,62],
+  [17,1],[17,8],[17,66],[17,30],[17,22],
+  [12,4],[12,33],[12,70],
+  [13,62],[13,63],[13,64],[13,0],
+  [14,27],[14,0],
+  [27,62],[27,63],[27,35],[27,65],[27,71],
+  [33,0],[33,35],[33,36],[33,38],[33,41],
+  [34,0],[34,35],[34,62],[34,27],
+  [35,62],[35,63],[35,65],[35,71],[35,38],
+  [36,33],[36,39],[36,37],[36,38],
+  [37,39],[37,38],[37,43],
+  [38,40],[40,41],[41,42],[42,43],
+  [23,24],[23,25],[23,4],
+  [25,4],[26,4],[26,3],
+  [62,63],[62,65],[63,65],[64,65],[66,69],[67,68],[70,74],[72,73],[72,75],
+  [52,1],[53,7],[58,11],[59,11],[60,11],[61,11],
+  [15,3],[15,2],[15,5],[15,26],
+  [16,11],[16,4],[16,70],[16,66],
+];
+
+const INDONESIAN_CONNECTIONS = [
+  [24,4],[24,3],[24,63],[24,62],[24,35],[24,10],[24,1],[24,0],
+  [24,71],[24,70],[24,28],[24,68],[24,69],[24,8],[24,9],
+  [24,74],[24,72],[24,65],[24,66],[24,73],
+  [4,63],[4,62],[4,70],
+  [10,71],[10,63],
+  [1,68],[8,69],
+];
+
+const scene = new THREE.Scene();
+let W = window.innerWidth, H = window.innerHeight;
+const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
+camera.position.z = 3.2;
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000);
+document.body.appendChild(renderer.domElement);
+
+const R = 1.0;
+const pivot = new THREE.Group();
+scene.add(pivot);
+
+function ll(lat, lng, r) {
+  const phi   = (90 - lat)  * Math.PI / 180;
+  const theta = (lng + 180) * Math.PI / 180;
+  return new THREE.Vector3(
+    -r * Math.sin(phi) * Math.cos(theta),
+     r * Math.cos(phi),
+     r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function makeCurve(a, b, extraLift) {
+  const n1 = ll(CITIES[a].lat, CITIES[a].lng, 1).normalize();
+  const n2 = ll(CITIES[b].lat, CITIES[b].lng, 1).normalize();
+  const dot = Math.max(-1, Math.min(1, n1.dot(n2)));
+  const ang = Math.acos(dot);
+  const hover = R * (extraLift ? 1.032 : 1.018);
+  const STEPS = 80;
+  const points = [];
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    let dir;
+    if (ang < 0.001) {
+      dir = n1.clone();
+    } else {
+      const s = Math.sin(ang);
+      dir = n1.clone().multiplyScalar(Math.sin((1-t)*ang)/s)
+               .add(n2.clone().multiplyScalar(Math.sin(t*ang)/s))
+               .normalize();
+    }
+    points.push(dir.multiplyScalar(hover));
+  }
+  return new THREE.CatmullRomCurve3(points);
+}
+
+function makeLabel(cityName, countryName, isRed) {
+  const canvas = document.createElement('canvas');
+  canvas.width  = 256;
+  canvas.height = 56;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 256, 56);
+  const color = isRed ? '#ff5555' : '#ffffff';
+  const dim   = isRed ? 'rgba(255,120,120,0.55)' : 'rgba(255,255,255,0.45)';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillStyle = color;
+  ctx.fillText(cityName, 0, 24);
+  ctx.font = '17px monospace';
+  ctx.fillStyle = dim;
+  ctx.fillText(countryName, 0, 46);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map:tex, transparent:true, opacity:0.85, depthWrite:false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.38, 0.085, 1);
+  return sprite;
+}
+
+async function init() {
+  const bar = document.getElementById('loading-bar');
+  bar.style.width = '25%';
+
+  const world = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/land-50m.json');
+  bar.style.width = '60%';
+  const land = topojson.feature(world, world.objects.land);
+
+  const CW=2048, CH=1024;
+  const tc = document.createElement('canvas');
+  tc.width=CW; tc.height=CH;
+  const ctx2 = tc.getContext('2d');
+  ctx2.fillStyle='#040404'; ctx2.fillRect(0,0,CW,CH);
+  const proj = d3.geoEquirectangular().scale(CW/(2*Math.PI)).translate([CW/2,CH/2]);
+  const path = d3.geoPath(proj, ctx2);
+  ctx2.fillStyle='#111111'; ctx2.beginPath(); path(land); ctx2.fill();
+  ctx2.strokeStyle='#1e1e1e'; ctx2.lineWidth=1.0; ctx2.beginPath(); path(land); ctx2.stroke();
+
+  pivot.add(new THREE.Mesh(
+    new THREE.SphereGeometry(R,72,72),
+    new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(tc) })
+  ));
+  pivot.add(new THREE.Mesh(
+    new THREE.SphereGeometry(R*1.001,36,36),
+    new THREE.MeshBasicMaterial({ color:0x181818, wireframe:true, transparent:true, opacity:0.07 })
+  ));
+
+  bar.style.width = '80%';
+
+  const arcGroup  = new THREE.Group();
+  const arcCurves = [];
+  CONNECTIONS.forEach(([a,b]) => {
+    const curve = makeCurve(a, b, false);
+    arcCurves.push(curve);
+    arcGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(curve.getPoints(80)),
+      new THREE.LineBasicMaterial({ color:0x1d1d1d, transparent:true, opacity:0.9 })
+    ));
+  });
+  pivot.add(arcGroup);
+
+  const redArcGroup = new THREE.Group();
+  const redCurves   = [];
+  INDONESIAN_CONNECTIONS.forEach(([a,b]) => {
+    const curve = makeCurve(a, b, true);
+    redCurves.push(curve);
+    redArcGroup.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(curve.getPoints(80)),
+      new THREE.LineBasicMaterial({ color:0xcc2020, transparent:true, opacity:0.80 })
+    ));
+  });
+  pivot.add(redArcGroup);
+
+  const nodeGroup  = new THREE.Group();
+  const labelGroup = new THREE.Group();
+
+  CITIES.forEach((c, i) => {
+    const isRed = INDONESIAN_CONNECTIONS.some(([a,b]) => a===i || b===i);
+    const col   = isRed ? 0xff4444 : 0xffffff;
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.020,8,8),
+      new THREE.MeshBasicMaterial({ color:col, transparent:true, opacity: isRed ? 0.20 : 0.10 })
+    );
+    glow.position.copy(ll(c.lat, c.lng, R*1.012));
+    nodeGroup.add(glow);
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.009,8,8),
+      new THREE.MeshBasicMaterial({ color:col })
+    );
+    dot.position.copy(ll(c.lat, c.lng, R*1.013));
+    nodeGroup.add(dot);
+    const sprite = makeLabel(c.city, c.country, isRed);
+    sprite.position.copy(ll(c.lat, c.lng, R*1.10));
+    labelGroup.add(sprite);
+  });
+
+  pivot.add(nodeGroup);
+  pivot.add(labelGroup);
+
+  const travelGroup = new THREE.Group();
+  pivot.add(travelGroup);
+  const travellers  = [];
+
+  function spawnTraveller(forceRed) {
+    const isRed  = forceRed || (Math.random() < 0.30);
+    const curves = isRed ? redCurves : arcCurves;
+    if (!curves.length) return;
+    const idx      = Math.floor(Math.random() * curves.length);
+    const reversed = Math.random() < 0.5;
+    const mesh     = new THREE.Mesh(
+      new THREE.SphereGeometry(isRed ? 0.020 : 0.015, 6,6),
+      new THREE.MeshBasicMaterial({ color: isRed ? 0xff3333 : 0xffffff, transparent:true, opacity:0 })
+    );
+    travelGroup.add(mesh);
+    travellers.push({ curve:curves[idx], reversed, mesh, t:0,
+      speed:(isRed ? 0.0035 : 0.004) + Math.random()*0.005, isRed });
+  }
+
+  for (let i=0; i<28; i++) { spawnTraveller(false); travellers[travellers.length-1].t=Math.random(); }
+  for (let i=0; i<8;  i++) { spawnTraveller(true);  travellers[travellers.length-1].t=Math.random(); }
+
+  bar.style.width='100%';
+  await new Promise(r=>setTimeout(r,250));
+  const loader=document.getElementById('loading');
+  loader.style.opacity='0';
+  setTimeout(()=>loader.style.display='none', 700);
+
+  let isDragging=false, prevX=0, prevY=0, velX=0, velY=0, autoSpin=true;
+
+  renderer.domElement.addEventListener('mousedown', e=>{
+    isDragging=true; prevX=e.clientX; prevY=e.clientY; autoSpin=false;
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!isDragging) return;
+    velY+=(e.clientX-prevX)*0.005; velX+=(e.clientY-prevY)*0.004;
+    prevX=e.clientX; prevY=e.clientY;
+  });
+  window.addEventListener('mouseup', ()=>{ isDragging=false; setTimeout(()=>autoSpin=true,2500); });
+  renderer.domElement.addEventListener('wheel', e=>{
+    camera.position.z=Math.max(1.6,Math.min(6.5,camera.position.z+e.deltaY*0.003));
+  },{ passive:true });
+
+  let tStart=null, pinchDist0=null, camZ0=null;
+  renderer.domElement.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    if(e.touches.length===1){ tStart={x:e.touches[0].clientX,y:e.touches[0].clientY}; isDragging=true; autoSpin=false; }
+    else if(e.touches.length===2){
+      pinchDist0=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      camZ0=camera.position.z;
+    }
+  },{passive:false});
+  renderer.domElement.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    if(e.touches.length===1&&tStart){
+      velY+=(e.touches[0].clientX-tStart.x)*0.005; velX+=(e.touches[0].clientY-tStart.y)*0.004;
+      tStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    } else if(e.touches.length===2&&pinchDist0!==null){
+      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      camera.position.z=Math.max(1.6,Math.min(6.5,camZ0*(pinchDist0/d)));
+    }
+  },{passive:false});
+  renderer.domElement.addEventListener('touchend',()=>{ isDragging=false; setTimeout(()=>autoSpin=true,2500); });
+
+  function animate() {
+    requestAnimationFrame(animate);
+    if(autoSpin) velY+=0.00038;
+    velX*=0.90; velY*=0.90;
+    pivot.rotation.y+=velY;
+    pivot.rotation.x=Math.max(-0.85,Math.min(0.85,pivot.rotation.x+velX));
+    const camDist = camera.position.z;
+    const labelScale = camDist * 0.115;
+    labelGroup.children.forEach(s => s.scale.set(labelScale, labelScale*0.22, 1));
+    for(let i=travellers.length-1; i>=0; i--){
+      const tr=travellers[i];
+      tr.t+=tr.speed;
+      const p=tr.reversed?1.0-Math.min(tr.t,1.0):Math.min(tr.t,1.0);
+      tr.mesh.position.copy(tr.curve.getPoint(p));
+      const fade=tr.t<0.08?tr.t/0.08:tr.t>0.92?(1.0-tr.t)/0.08:1.0;
+      tr.mesh.material.opacity=Math.max(0,Math.min(1,fade));
+      if(tr.t>=1.06){
+        travelGroup.remove(tr.mesh);
+        tr.mesh.geometry.dispose(); tr.mesh.material.dispose();
+        travellers.splice(i,1);
+        spawnTraveller(false);
+      }
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+}
+
+init().catch(err=>{
+  document.getElementById('loading-text').textContent='FAILED — CHECK INTERNET';
+  console.error(err);
+});
+
+window.addEventListener('resize',()=>{
+  W=window.innerWidth; H=window.innerHeight;
+  camera.aspect=W/H; camera.updateProjectionMatrix();
+  renderer.setSize(W,H);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veritas Project — Sistem Deteksi Shell Company</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── ACCENT VARS (never change) ── */
+:root {
+  --red:       #8b1a1a;
+  --red-mid:   #a52222;
+  --red-bright:#c0392b;
+  --red-dim:   rgba(139,26,26,0.12);
+  --node:      #7c3aed;
+  --node-glow: rgba(124,58,237,0.35);
+  --edge-col:  #2563eb;
+  --sans: 'Barlow', Arial, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+
+/* ── LIGHT MODE (default) ── */
+body {
+  --bg:      #f4f4f0;
+  --surface: #ffffff;
+  --text:    #111111;
+  --muted:   rgba(17,17,17,0.55);
+  --faint:   rgba(17,17,17,0.30);
+  --border:  rgba(0,0,0,0.10);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-weight: 400;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 1.75s ease, color 1.75s ease;
+}
+
+/* ── DARK MODE ── toggled by JS adding .is-dark to body */
+body.is-dark {
+  --bg:      #0c0c0c;
+  --surface: #161616;
+  --text:    #f0f0f0;
+  --muted:   rgba(240,240,240,0.55);
+  --faint:   rgba(240,240,240,0.28);
+  --border:  rgba(255,255,255,0.10);
+}
+
+/* Smooth transitions on all color-bearing elements */
+#pipeline, #kyc, footer,
+.gnn-card, .gnn-hd, .gnn-ctrl, .gnn-body,
+.form-panel, .result-panel,
+.ktable, .scard, .band-dark-light {
+  transition: background-color 1.75s ease, border-color 1.75s ease;
+}
+h2, .sec-eye, .gnn-hd-title, .gnn-desc,
+.ktable td, .scard-title, .scard-sub,
+.flags-list li, .flags-list strong, .flags-title,
+label, .form-intro, .r-empty-txt, .out-lbl,
+.out-pct, .out-vtitle, .out-vsub,
+.bk-name, .bk-val, .out-disc, .f-brand, .f-meta,
+.pill, input, select, .tog {
+  transition: color 1.75s ease, background-color 1.75s ease, border-color 1.75s ease;
+}
+
+/* ── LOADING SCREEN ── */
+#ls {
+  position:fixed;inset:0;background:#000;z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .9s ease,visibility .9s ease;
+}
+#ls.out{opacity:0;visibility:hidden;}
+.ls-logo{display:flex;align-items:center;gap:28px;margin-bottom:52px;}
+.person-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.p{display:flex;flex-direction:column;align-items:center;}
+.p-head{width:22px;height:22px;border-radius:50%;background:#fff;}
+.p-body{width:38px;height:22px;background:#fff;border-radius:19px 19px 0 0;margin-top:3px;}
+.p.sus .p-head,.p.sus .p-body{background:var(--red);}
+.ls-div{width:1px;height:90px;background:linear-gradient(to bottom,transparent,rgba(255,255,255,.28),transparent);}
+.ls-text{display:flex;flex-direction:column;}
+.ls-v{font-family:var(--sans);font-size:60px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.01em;}
+.ls-p{font-family:var(--sans);font-size:32px;font-weight:300;color:rgba(255,255,255,.50);letter-spacing:.04em;margin-top:2px;}
+.ls-bar-wrap{width:240px;height:1px;background:rgba(255,255,255,.10);}
+.ls-bar{height:100%;width:0%;background:var(--red-mid);transition:width .32s ease;}
+.ls-status{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:rgba(255,255,255,.2);margin-top:14px;text-transform:uppercase;}
+
+/* ── NAV ── */
+nav {
+  position:fixed;top:0;left:0;right:0;z-index:500;height:52px;
+  display:flex;align-items:center;justify-content:space-between;padding:0 48px;
+  background:rgba(10,10,10,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.nav-name{font-family:var(--sans);font-size:17px;font-weight:600;letter-spacing:.06em;color:#f5f5f5;text-transform:uppercase;}
+.nav-links{display:flex;gap:32px;list-style:none;}
+.nav-links a{font-family:var(--mono);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(245,245,245,.50);text-decoration:none;transition:color .2s;}
+.nav-links a:hover{color:#f5f5f5;}
+
+/* ── HERO — transparent so fixed canvas shows through ── */
+#hero {
+  position:relative;
+  min-height:100vh;
+  padding-top:0;
+  background:transparent;
+  overflow:visible;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+}
+
+/* Full-page network canvas — covers ALL sections */
+#net-canvas {
+  position:fixed;inset:0;width:100%;height:100%;
+  z-index:0;pointer-events:none;opacity:.5;
+}
+
+/* Hero content sits above canvas */
+.hero-inner {
+  position:relative;z-index:2;
+  display:grid;
+  grid-template-columns:52% 48%;
+  align-items:center;
+  padding:72px 4vw 40px; /* 72px = nav 52px + 20px breathing room */
+  gap:0;
+  min-height:100vh;
+}
+.hero-text-block{display:flex;flex-direction:column;padding-right:4vw;}
+.eyebrow{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.36em;text-transform:uppercase;
+  color:var(--red-mid);margin-bottom:20px;display:flex;align-items:center;gap:12px;
+}
+.eyebrow::before{content:'';display:block;width:22px;height:1px;background:var(--red-mid);}
+h1{
+  font-family:var(--sans);font-size:clamp(44px,6vw,88px);font-weight:700;
+  line-height:1.0;letter-spacing:-.03em;color:var(--text);margin-bottom:0;
+}
+h1 .acc{color:var(--red-bright);}
+
+/* Right side */
+.hero-right-col {
+  display:flex;flex-direction:column;gap:28px;align-items:flex-start;
+  padding:28px 4vw;
+  border-left:1px solid var(--border);
+  height:100%;justify-content:center;
+  background:rgba(244,244,240,0.55);
+  backdrop-filter:blur(3px);
+  position:relative;z-index:2;
+}
+.hstat{display:flex;flex-direction:column;}
+.hstat-val{font-family:var(--sans);font-size:clamp(20px,2.2vw,32px);font-weight:700;color:var(--text);line-height:1;}
+.hstat-val.accent{color:var(--red-bright);}
+.hstat-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-top:6px;}
+
+/* Music button — fixed bottom-right, scrolls with page */
+#music-btn {
+  position:fixed;bottom:28px;right:28px;z-index:9000;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(10,10,10,.82);border:1px solid rgba(255,255,255,.20);
+  color:rgba(255,255,255,.65);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .2s,color .2s,transform .2s;
+  backdrop-filter:blur(10px);
+  box-shadow:0 4px 16px rgba(0,0,0,.25);
+}
+#music-btn:hover{border-color:rgba(192,57,43,.7);color:rgba(192,57,43,1);transform:scale(1.08);}
+#music-btn.playing{border-color:rgba(192,57,43,.5);color:rgba(192,57,43,.85);}
+
+
+/* ── MODEL COMPARISON DISPLAY ── */
+.model-compare-wrap {
+  display:flex;flex-direction:column;gap:16px;width:100%;
+}
+.mc-title {
+  font-family:var(--sans);font-size:15px;font-weight:400;
+  color:var(--muted);line-height:1.5;
+  border-left:2px solid var(--red-mid);padding-left:12px;
+}
+.mc-bars { display:flex;flex-direction:column;gap:16px; }
+
+.mc-row {
+  display:flex;flex-direction:column;gap:7px;
+  padding:16px 18px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,0.88);
+  backdrop-filter:blur(4px);
+  transition:border-color .2s, box-shadow .2s;
+  position:relative;z-index:2;
+}
+body.is-dark .mc-row { background:rgba(22,22,22,0.88); }
+.mc-row:hover { border-color:rgba(139,26,26,.3); box-shadow:0 2px 12px rgba(0,0,0,.06); }
+.mc-row-top {
+  border-color:rgba(139,26,26,.35);
+  background:linear-gradient(135deg, rgba(139,26,26,.04), var(--surface));
+}
+.mc-row-top:hover { border-color:var(--red-mid); box-shadow:0 4px 20px rgba(139,26,26,.12); }
+
+.mc-meta { display:flex;align-items:baseline;justify-content:space-between;gap:8px; }
+.mc-name {
+  font-family:var(--sans);font-size:16px;font-weight:700;color:var(--text);
+}
+.mc-miss {
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  color:var(--red-mid);opacity:.9;
+}
+.mc-miss-best { color:var(--red-bright);font-weight:600;opacity:1; }
+
+/* The stacked bar */
+.mc-bar-track {
+  display:flex;height:6px;width:100%;overflow:hidden;border-radius:2px;
+  background:var(--bg);
+}
+.mc-bar-fill {
+  height:100%;width:0%;
+  background:var(--red-bright);
+  transition:width 1.2s cubic-bezier(.16,1,.3,1);
+}
+.mc-bar-good {
+  height:100%;width:0%;
+  background:#d1d8d0;
+  transition:width 1.2s cubic-bezier(.16,1,.3,1) .05s;
+}
+body.is-dark .mc-bar-good { background:#2a3a2a; }
+/* GNN good bar is green — the HOOK */
+.gnn-good { background:#4a7c59 !important; }
+.gnn-fill { background:var(--red-bright) !important; }
+
+.mc-nums {
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+}
+.mc-bad { color:var(--red-bright); }
+.mc-ok  { color:var(--faint); }
+.mc-ok-best { color:#4a7c59; font-weight:700; }
+
+.mc-legend-row {
+  display:flex;gap:20px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  color:var(--faint);margin-top:2px;
+}
+.mc-leg { display:flex;align-items:center;gap:7px; }
+.mc-leg-dot { width:10px;height:4px;border-radius:1px;flex-shrink:0; }
+
+.hero-stat-row{display:flex;gap:40px;}
+
+
+/* Globe button */
+.globe-btn {
+  display:inline-flex;align-items:center;gap:14px;
+  padding:16px 28px;
+  background:var(--text);
+  border:2px solid var(--text);
+  color:var(--bg);
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  text-decoration:none;cursor:pointer;
+  transition:background .25s, border-color .25s, color .25s, transform .2s, box-shadow .25s;
+  font-weight:500;
+}
+.globe-btn:hover{
+  background:var(--red);
+  border-color:var(--red);
+  color:#fff;
+  transform:translateY(-2px);
+  box-shadow:0 8px 28px rgba(139,26,26,0.30);
+}
+.globe-btn:active{transform:translateY(0);}
+.globe-btn .btn-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--red-bright);
+  flex-shrink:0;
+  animation:pulse-btn 1.8s ease-in-out infinite;
+  transition:background .25s;
+}
+.globe-btn:hover .btn-dot{background:#fff;}
+@keyframes pulse-btn{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.6)}}
+.globe-btn .btn-arrow{margin-left:6px;transition:transform .25s;font-size:14px;}
+.globe-btn:hover .btn-arrow{transform:translateX(5px);}
+
+/* Bottom strip */
+.hero-bottom {
+  position:relative;z-index:2;
+  padding:0 5vw 36px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.hero-caption {
+  font-family:var(--mono);font-size:9px;letter-spacing:.25em;text-transform:uppercase;
+  color:var(--faint);
+}
+
+.globe-tag{ display:none; }
+/* remove old styles that no longer apply */
+.hero-overlay{display:none;}
+.hero-stats{display:none;}
+#globe-legend{display:none;}
+#globe-video{display:none;}
+
+/* ── TRANSITION BAND (pipeline bottom → kyc) ── */
+.band-dark-light{
+  height:60px;
+  background:transparent;
+  transition:background 1.75s ease;
+}
+body.is-dark .band-dark-light{
+  background:transparent;
+}
+
+/* ── PIPELINE SECTION ── */
+#pipeline{
+  background:rgba(244,244,240,0.72);
+  backdrop-filter:blur(2px);
+  padding:72px 5vw 120px;
+  position:relative; z-index:2;
+}
+body.is-dark #pipeline { background:rgba(12,12,12,0.72); }
+
+.sec-eye{
+  font-family:var(--mono);font-size:10px;letter-spacing:.38em;text-transform:uppercase;
+  color:var(--red-mid);margin-bottom:16px;display:flex;align-items:center;gap:12px;
+}
+.sec-eye::before{content:'';display:inline-block;width:20px;height:1px;background:var(--red-mid);}
+h2{
+  font-family:var(--sans);font-size:clamp(28px,3.5vw,46px);font-weight:700;
+  line-height:1.05;letter-spacing:-.02em;margin-bottom:52px;color:var(--text);
+}
+
+.gnn-card{background:var(--surface);border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column;}
+.gnn-hd{padding:18px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg);}
+.gnn-hd-title{font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text);}
+.stepper{display:flex;gap:6px;flex-wrap:wrap;}
+.pill{
+  padding:6px 14px;font-family:var(--mono);font-size:10px;font-weight:400;
+  color:var(--muted);background:transparent;border:1px solid var(--border);
+  transition:all .25s;letter-spacing:.06em;cursor:pointer;text-transform:uppercase;
+}
+.pill:hover{color:var(--text);border-color:rgba(0,0,0,.25);}
+body.is-dark .pill:hover{border-color:rgba(255,255,255,.25);}
+.pill.done{color:var(--red-mid);border-color:rgba(139,26,26,.3);background:rgba(139,26,26,.06);}
+.pill.active{color:#fff;background:var(--red);border-color:var(--red);}
+
+.gnn-body{flex:1;position:relative;min-height:360px;background:var(--surface);}
+.sp{
+  position:absolute;inset:0;opacity:0;pointer-events:none;
+  transition:opacity .4s ease,transform .4s ease;transform:translateY(12px);
+  display:flex;align-items:center;justify-content:center;padding:28px 32px;
+}
+.sp.active{opacity:1;pointer-events:auto;transform:translateY(0);}
+
+/* Stage 1 table */
+.ktable{width:100%;border-collapse:collapse;background:var(--bg);}
+.ktable th,.ktable td{padding:13px 18px;text-align:left;border-bottom:1px solid var(--border);font-size:13.5px;font-family:var(--sans);color:var(--text);}
+.ktable th{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--red-mid);background:var(--bg);font-weight:400;opacity:.7;}
+.ktable tr:last-child td{border-bottom:none;}
+.ktable tr.fl td{background:rgba(139,26,26,.06);}
+.fbadge{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--red-bright);border:1px solid rgba(192,57,43,.35);padding:2px 7px;margin-left:8px;}
+
+/* Graph — bigger nodes, all text inside */
+.graph-area{width:100%;height:100%;min-height:320px;position:relative;background:var(--surface);}
+.graph-area svg{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;}
+.gnode{position:absolute;z-index:2;transform:translate(-50%,-50%);}
+.gnode-c{
+  border-radius:50%;background:var(--node);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:9.5px;font-weight:500;color:#fff;
+  text-align:center;line-height:1.35;padding:8px;
+  box-shadow:0 2px 14px var(--node-glow);
+}
+.gnode-c.ent{background:var(--red);box-shadow:0 2px 14px rgba(139,26,26,.4);}
+.pulse-mode .gnode-c{background:var(--edge-col);box-shadow:0 0 22px rgba(37,99,235,.5);}
+.pulse-mode .gnode-c.ent{background:var(--red-bright);box-shadow:0 0 22px rgba(139,26,26,.5);}
+.pulse-mode svg line{stroke:var(--edge-col);stroke-dasharray:6 4;animation:dash .9s linear infinite;}
+@keyframes dash{to{stroke-dashoffset:-10;}}
+
+/* Graph node color legend */
+.graph-legend{
+  position:absolute;top:14px;right:14px;z-index:5;
+  display:flex;flex-direction:column;gap:6px;
+  background:var(--surface);border:1px solid var(--border);
+  padding:10px 14px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+}
+.gl-item{display:flex;align-items:center;gap:8px;color:var(--muted);}
+.gl-swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.embed-viz{width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.embed-viz svg{width:100%;max-width:560px;height:auto;}
+
+/* Stage 5 score card */
+.scard{background:var(--bg);width:90%;max-width:580px;border:1px solid var(--border);border-left:3px solid var(--red-bright);padding:28px 32px;}
+.scard-top{display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:20px;}
+.scard-score{font-family:var(--sans);font-size:56px;font-weight:700;color:var(--red-bright);line-height:1;letter-spacing:-.02em;min-width:90px;}
+.scard-title{font-family:var(--sans);font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.scard-sub{font-size:13px;font-weight:300;color:var(--muted);}
+.flags-title{font-family:var(--mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-bottom:12px;}
+.flags-list{list-style:none;display:flex;flex-direction:column;gap:9px;}
+.flags-list li{font-size:13px;color:var(--muted);line-height:1.55;padding-left:14px;position:relative;}
+.flags-list li::before{content:'›';position:absolute;left:0;color:var(--red-bright);font-weight:700;}
+.flags-list strong{color:var(--text);font-weight:600;}
+
+/* GNN controls */
+.gnn-ctrl{padding:16px 28px;background:var(--bg);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.gnn-desc{font-size:13px;font-weight:400;color:var(--text);opacity:.75;width:55%;line-height:1.55;}
+.ctrl-btn{background:var(--red);color:#fff;border:none;padding:9px 22px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;cursor:pointer;transition:background .2s;text-transform:uppercase;}
+.ctrl-btn:hover:not(:disabled){background:var(--red-mid);}
+.ctrl-btn:disabled{background:rgba(128,128,128,.2);color:rgba(128,128,128,.5);cursor:not-allowed;}
+
+/* ── KYC SECTION ── */
+#kyc{
+  background:rgba(244,244,240,0.72);
+  backdrop-filter:blur(2px);
+  padding:80px 5vw;
+  position:relative;z-index:2;
+}
+body.is-dark #kyc{background:rgba(12,12,12,0.72);}
+
+.kyc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);}
+.form-panel{background:var(--surface);padding:44px;}
+.result-panel{background:var(--bg);padding:44px;display:flex;flex-direction:column;gap:20px;}
+
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:15px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.tog-row{display:flex;gap:3px;}
+label{font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);}
+input,select{
+  background:var(--bg);border:1px solid var(--border);color:var(--text);
+  font-family:var(--mono);font-size:12px;padding:10px 13px;outline:none;
+  -webkit-appearance:none;
+}
+input::placeholder{color:var(--faint);}
+input:focus,select:focus{border-color:rgba(165,34,34,.5);}
+select option{background:var(--bg);}
+body.is-dark select option{background:#161616;}
+body.is-dark input::placeholder{color:rgba(240,240,240,.25);}
+.tog{flex:1;padding:9px 5px;background:transparent;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;border:1px solid var(--border);color:var(--faint);}
+.tog.on{border-color:var(--red);color:var(--red-bright);background:var(--red-dim);}
+.run-btn{width:100%;padding:14px;background:var(--red);border:none;color:#fff;font-family:var(--sans);font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:background .2s;margin-top:8px;}
+.run-btn:hover{background:var(--red-mid);}
+
+/* Result panel */
+.form-intro{font-size:13px;font-weight:300;color:var(--muted);line-height:1.65;margin-bottom:22px;}
+.r-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:.25;min-height:280px;}
+.r-empty-icon{font-size:32px;}
+.r-empty-txt{font-family:var(--mono);font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;text-align:center;line-height:1.9;color:var(--faint);}
+.score-out{opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;display:flex;flex-direction:column;gap:18px;}
+.score-out.show{opacity:1;transform:translateY(0);}
+.out-lbl{font-family:var(--mono);font-size:9px;letter-spacing:.28em;text-transform:uppercase;color:var(--faint);}
+.out-num-wrap{display:flex;align-items:baseline;gap:4px;}
+.out-num{font-family:var(--sans);font-size:80px;font-weight:700;line-height:1;letter-spacing:-.03em;transition:color .5s;}
+.out-pct{font-family:var(--sans);font-size:32px;font-weight:300;color:var(--muted);}
+.out-bar-wrap{height:4px;background:rgba(128,128,128,.15);overflow:hidden;}
+.out-bar{height:100%;width:0%;transition:width 1.3s cubic-bezier(.16,1,.3,1),background .5s;}
+.out-verdict{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-left:3px solid transparent;transition:all .5s;}
+.out-vdot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+.out-vtitle{font-family:var(--sans);font-size:15px;font-weight:600;margin-bottom:3px;}
+.out-vsub{font-size:13px;font-weight:300;color:var(--muted);line-height:1.55;}
+.breakdown{display:flex;flex-direction:column;gap:9px;}
+.bk-row{display:flex;flex-direction:column;gap:4px;}
+.bk-hd{display:flex;justify-content:space-between;}
+.bk-name{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);}
+.bk-val{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.bk-bar-w{height:2px;background:rgba(128,128,128,.15);overflow:hidden;}
+.bk-bar{height:100%;width:0%;transition:width 1.5s cubic-bezier(.16,1,.3,1);}
+.out-disc{font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--faint);line-height:1.65;border-top:1px solid var(--border);padding-top:14px;}
+
+/* ── FOOTER ── */
+footer{padding:32px 5vw;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(244,244,240,0.80);backdrop-filter:blur(2px);position:relative;z-index:2;}
+body.is-dark footer{background:rgba(12,12,12,0.80);}
+.f-brand{font-family:var(--sans);font-size:16px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text);}
+.f-meta{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--faint);text-align:right;line-height:1.9;text-transform:uppercase;}
+
+/* ── UTIL ── */
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .65s,transform .65s;}
+.reveal.in{opacity:1;transform:translateY(0);}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(128,128,128,.3);}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="ls">
+  <div class="ls-logo">
+    <div class="person-grid">
+      <div class="p"><div class="p-head"></div><div class="p-body"></div></div>
+      <div class="p sus"><div class="p-head"></div><div class="p-body"></div></div>
+      <div class="p"><div class="p-head"></div><div class="p-body"></div></div>
+      <div class="p"><div class="p-head"></div><div class="p-body"></div></div>
+    </div>
+    <div class="ls-div"></div>
+    <div class="ls-text">
+      <div class="ls-v">Veritas</div>
+      <div class="ls-p">Project</div>
+    </div>
+  </div>
+  <div class="ls-bar-wrap"><div class="ls-bar" id="lbar"></div></div>
+  <div class="ls-status" id="lstatus">Memuat data jaringan...</div>
+</div>
+
+<!-- NAV -->
+<!-- Fixed full-page network canvas — behind everything -->
+<canvas id="net-canvas"></canvas>
+
+<!-- Music button — fixed bottom-right -->
+<button id="music-btn" onclick="toggleMusic()" title="Toggle music">
+  <span id="music-icon">♪</span>
+</button>
+
+<nav>
+  <div class="nav-name">Veritas Project</div>
+  <ul class="nav-links">
+    <li><a href="#hero">Ikhtisar</a></li>
+    <li><a href="#pipeline">Mesin GNN</a></li>
+    <li><a href="#kyc">Analisis KYC</a></li>
+  </ul>
+</nav>
+
+<!-- AMBIENT MUSIC PLAYER -->
+<!-- ╔══════════════════════════════════════════════════════╗ -->
+<!-- ║  PUT YOUR MUSIC FILE NAME HERE ↓                    ║ -->
+<audio id="bg-music" loop>
+  <source src="mozart.mp3" type="audio/mpeg">
+</audio>
+<!-- ║  Replace YOUR_MUSIC_FILE.mp3 with your actual file  ║ -->
+<!-- ║  Place the .mp3 in the same folder as this HTML     ║ -->
+<!-- ╚══════════════════════════════════════════════════════╝ -->
+
+<!-- Music toggle button — fixed top-right -->
+<button id="music-btn" onclick="toggleMusic()" title="Toggle music">
+  <span id="music-icon">♪</span>
+</button>
+
+<style>
+#music-btn {
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  color:rgba(255,255,255,.55);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .2s,color .2s,background .2s;
+}
+#music-btn:hover{border-color:rgba(192,57,43,.6);color:rgba(192,57,43,.9);}
+#music-btn.playing{border-color:rgba(192,57,43,.5);color:rgba(192,57,43,.8);}
+</style>
+<section id="hero">
+
+  <div class="hero-inner">
+    <div class="hero-text-block">
+      <div class="eyebrow">Sistem Forensik Deteksi Shell Company</div>
+      <h1>Mendeteksi<br><span class="acc">Shell Company</span><br>dengan AI Graph<br>Neural Network</h1>
+    </div>
+    <div class="hero-right-col">
+      <!-- Model comparison: accuracy framing vs "lolos salah" -->
+      <div class="model-compare-wrap">
+        <div class="mc-title">Seberapa banyak kasus shell company yang <em>berhasil diungkap</em>?</div>
+        <div class="mc-bars">
+          <!-- KYC Tradisional — red dominant -->
+          <div class="mc-row" id="mcr-kyc">
+            <div class="mc-meta">
+              <span class="mc-name">KYC Tradisional</span>
+              <span class="mc-miss">5 dari 100 kasus shell company lolos tidak terdeteksi</span>
+            </div>
+            <div class="mc-bar-track" style="height:10px;">
+              <div class="mc-bar-fill kyc-fill" style="--target:95%"></div>
+              <div class="mc-bar-good kyc-good" style="--target:5%"></div>
+            </div>
+            <div class="mc-nums">
+              <span class="mc-bad">95% tidak terdeteksi ✗</span>
+              <span class="mc-ok">5% terdeteksi</span>
+            </div>
+          </div>
+          <!-- Veritas GNN — green dominant -->
+          <div class="mc-row mc-row-top" id="mcr-gnn">
+            <div class="mc-meta">
+              <span class="mc-name">Veritas GNN</span>
+              <span class="mc-miss mc-miss-best">hanya 1,57 dari 100 yang lolos</span>
+            </div>
+            <div class="mc-bar-track" style="height:10px;">
+              <div class="mc-bar-good gnn-good" style="--target:98.43%"></div>
+              <div class="mc-bar-fill gnn-fill" style="--target:1.57%"></div>
+            </div>
+            <div class="mc-nums">
+              <span class="mc-ok mc-ok-best">98,43% terdeteksi ✓</span>
+              <span class="mc-bad">1,57% lolos ✗</span>
+            </div>
+          </div>
+        </div>
+        <div class="mc-legend-row">
+          <span class="mc-leg"><span class="mc-leg-dot" style="background:#4a7c59"></span>Berhasil terdeteksi</span>
+          <span class="mc-leg"><span class="mc-leg-dot" style="background:#c0392b"></span>Lolos tidak terdeteksi</span>
+        </div>
+      </div>
+      <a href="globe.html" target="_blank" class="globe-btn">
+        <span class="btn-dot"></span>
+        Lihat Jaringan Shell Company Indonesia
+        <span class="btn-arrow">→</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-bottom">
+    <div class="hero-caption">Veritas Project &nbsp;·&nbsp; Sampoerna University / University of Arizona</div>
+    <div class="hero-caption">Scroll untuk melihat cara kerja sistem ↓</div>
+  </div>
+</section>
+
+<div class="band-dark-light"></div>
+
+<!-- PIPELINE -->
+<section id="pipeline" class="reveal">
+  <div class="sec-eye">Cara Kerja Sistem</div>
+  <h2>Mesin Deteksi GNN</h2>
+  <div class="gnn-card">
+    <div class="gnn-hd">
+      <div class="gnn-hd-title">Pipeline KYC Berbasis GNN</div>
+      <div class="stepper" id="stpr"></div>
+    </div>
+    <div class="gnn-body">
+      <!-- Stage 1 -->
+      <div class="sp active" id="sp1">
+        <div style="width:96%;display:flex;flex-direction:column;gap:14px;">
+          <div style="font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--faint);border-left:2px solid var(--border);padding-left:10px;line-height:1.8;text-transform:uppercase;">
+            Contoh portofolio perusahaan yang disederhanakan — data nyata akan mencakup lebih banyak kolom seperti yurisdiksi direktur, yurisdiksi perantara, dan jenis perantara.
+          </div>
+          <table class="ktable" style="width:100%;">
+          <thead><tr>
+            <th>Nama Perusahaan</th><th>Direktur / Pejabat</th>
+            <th>Perantara Terdaftar</th><th>Yurisdiksi</th>
+          </tr></thead>
+          <tbody>
+            <tr class="fl">
+              <td>Meridian Capital Ltd <span class="fbadge">Ditandai</span></td>
+              <td>Alexander Petrov</td>
+              <td>Mossack Fonseca <span class="fbadge" style="background:rgba(14,116,144,.08);color:#0e7490;border-color:rgba(14,116,144,.35);">Firma Hukum</span></td>
+              <td>British Virgin Islands</td>
+            </tr>
+            <tr>
+              <td>Sunstone Holdings Pte</td>
+              <td>Li Wei Chen</td>
+              <td>DBS Trust Services</td>
+              <td>Singapura</td>
+            </tr>
+            <tr class="fl">
+              <td>Orion Advisory Corp <span class="fbadge">Ditandai</span></td>
+              <td>Alexander Petrov</td>
+              <td>Mossack Fonseca <span class="fbadge" style="background:rgba(14,116,144,.08);color:#0e7490;border-color:rgba(14,116,144,.35);">Firma Hukum</span></td>
+              <td>British Virgin Islands</td>
+            </tr>
+          </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Stage 2 -->
+      <div class="sp" id="sp2">
+        <div class="graph-area" id="ga1" style="position:relative;">
+          <div class="graph-legend">
+            <div class="gl-item"><div class="gl-swatch" style="background:#8b1a1a"></div>Entitas Korporat</div>
+            <div class="gl-item"><div class="gl-swatch" style="background:#7c3aed"></div>Pejabat / Pemilik</div>
+            <div class="gl-item"><div class="gl-swatch" style="background:#0e7490"></div>Perantara</div>
+          </div>
+        </div>
+      </div>
+      <!-- Stage 3 -->
+      <div class="sp" id="sp3">
+        <div class="graph-area pulse-mode" id="ga2" style="position:relative;">
+          <div class="graph-legend">
+            <div class="gl-item"><div class="gl-swatch" style="background:#8b1a1a"></div>Entitas Korporat</div>
+            <div class="gl-item"><div class="gl-swatch" style="background:#7c3aed"></div>Pejabat / Pemilik</div>
+            <div class="gl-item"><div class="gl-swatch" style="background:#0e7490"></div>Perantara</div>
+          </div>
+        </div>
+      </div>
+      <!-- Stage 4 -->
+      <div class="sp" id="sp4">
+        <div class="embed-viz">
+          <svg viewBox="0 0 520 280" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="rg1" cx="32%" cy="42%"><stop offset="0%" stop-color="#8b1a1a" stop-opacity=".5"/><stop offset="100%" stop-color="#8b1a1a" stop-opacity="0"/></radialGradient>
+              <radialGradient id="rg2" cx="72%" cy="62%"><stop offset="0%" stop-color="#2563eb" stop-opacity=".35"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></radialGradient>
+            </defs>
+            <rect x="0" y="0" width="520" height="280" rx="4" fill="transparent"/>
+            <ellipse cx="168" cy="120" rx="100" ry="72" fill="url(#rg1)"/>
+            <ellipse cx="358" cy="162" rx="93" ry="66" fill="url(#rg2)"/>
+            <circle cx="138" cy="102" r="5" fill="#c0392b" opacity=".9"/><circle cx="160" cy="93" r="5" fill="#c0392b" opacity=".9"/>
+            <circle cx="182" cy="110" r="5" fill="#c0392b" opacity=".9"/><circle cx="150" cy="125" r="5" fill="#c0392b" opacity=".9"/>
+            <circle cx="174" cy="136" r="5" fill="#c0392b" opacity=".85"/><circle cx="196" cy="117" r="5" fill="#c0392b" opacity=".85"/>
+            <circle cx="124" cy="116" r="5" fill="#c0392b" opacity=".7"/><circle cx="168" cy="85" r="5" fill="#c0392b" opacity=".75"/>
+            <circle cx="204" cy="131" r="5" fill="#c0392b" opacity=".8"/><circle cx="128" cy="140" r="5" fill="#c0392b" opacity=".65"/>
+            <circle cx="330" cy="154" r="5" fill="#2563eb" opacity=".8"/><circle cx="350" cy="144" r="5" fill="#2563eb" opacity=".8"/>
+            <circle cx="368" cy="165" r="5" fill="#2563eb" opacity=".8"/><circle cx="343" cy="178" r="5" fill="#2563eb" opacity=".8"/>
+            <circle cx="382" cy="151" r="5" fill="#2563eb" opacity=".8"/><circle cx="365" cy="186" r="5" fill="#2563eb" opacity=".7"/>
+            <circle cx="318" cy="170" r="5" fill="#2563eb" opacity=".7"/><circle cx="393" cy="168" r="5" fill="#2563eb" opacity=".7"/>
+            <circle cx="356" cy="132" r="5" fill="#2563eb" opacity=".75"/>
+            <circle cx="28" cy="256" r="5" fill="#c0392b"/>
+            <text x="40" y="261" fill="rgba(192,57,43,.85)" font-size="11" font-family="monospace">Shell (ICIJ)</text>
+            <circle cx="140" cy="256" r="5" fill="#2563eb"/>
+            <text x="152" y="261" fill="rgba(37,99,235,.85)" font-size="11" font-family="monospace">Legal (UK Companies House)</text>
+          </svg>
+        </div>
+      </div>
+      <!-- Stage 5 -->
+      <div class="sp" id="sp5">
+        <div class="scard">
+          <div class="scard-top">
+            <div class="scard-score">88%</div>
+            <div>
+              <div class="scard-title">RISIKO TINGGI — Struktur Shell Terdeteksi</div>
+              <div class="scard-sub">Peta relasi menunjukkan anomali topologi jaringan yang signifikan.</div>
+            </div>
+          </div>
+          <div class="flags-title">Bendera Merah Otomatis</div>
+          <ul class="flags-list">
+            <li><strong>Anomali Perantara Bersama:</strong> Meridian Capital Ltd dan Orion Advisory Corp keduanya menggunakan firma hukum yang sama (Mossack Fonseca) sebagai agen pendiri di BVI — pola umum dalam Panama Papers.</li>
+            <li><strong>Kontrol Melingkar:</strong> Direktur "Alexander Petrov" terhubung ke beberapa lapisan perusahaan yang tidak transparan.</li>
+            <li><strong>Kedekatan Jaringan:</strong> Jarak 2-hop ke entitas yang dikenai sanksi melalui simpul perantara.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="gnn-ctrl">
+      <button class="ctrl-btn" id="pgnn" disabled>← Sebelumnya</button>
+      <div class="gnn-desc" id="gdesc"></div>
+      <button class="ctrl-btn" id="ngnn">Berikutnya →</button>
+    </div>
+  </div>
+</section>
+
+<!-- KYC -->
+<section id="kyc">
+  <div class="sec-eye">Alat Intelijen KYC</div>
+  <h2>Mesin Penilaian <em style="font-weight:300;">Kecurigaan Perusahaan</em></h2>
+  <div class="kyc-grid">
+    <div class="form-panel">
+      <div class="sec-eye" style="margin-bottom:8px;">Masukkan Data Perusahaan</div>
+      <p class="form-intro">Masukkan detail perusahaan. Sistem akan menghitung skor kemungkinan shell company menggunakan faktor risiko yurisdiksi dan sinyal topologi grafik kepemilikan.</p>
+      <div class="field"><label>Nama Perusahaan</label><input type="text" id="cname" placeholder="cth. Meridian Capital Ltd."/></div>
+      <div class="two-col">
+        <div class="field"><label>Yurisdiksi Perusahaan</label>
+          <select id="jur">
+            <option value="">— Pilih —</option>
+            <optgroup label="🔴 Risiko Tinggi">
+              <option value="bvi">British Virgin Islands</option><option value="cayman">Kepulauan Cayman</option>
+              <option value="panama">Panama</option><option value="seychelles">Seychelles</option>
+              <option value="samoa">Samoa</option><option value="niue">Niue</option>
+              <option value="cook">Kepulauan Cook</option><option value="aruba">Aruba</option>
+              <option value="bermuda">Bermuda</option><option value="bahamas">Bahamas</option>
+              <option value="cyprus">Siprus</option><option value="mauritius">Mauritius</option>
+              <option value="liechtenstein">Liechtenstein</option>
+            </optgroup>
+            <optgroup label="🟡 Risiko Sedang">
+              <option value="luxembourg">Luksemburg</option><option value="malta">Malta</option>
+              <option value="monaco">Monako</option><option value="jersey">Jersey</option>
+              <option value="singapore">Singapura</option><option value="hongkong">Hong Kong</option>
+              <option value="uae">UEA / Dubai</option><option value="indonesia">Indonesia</option>
+              <option value="switzerland">Swiss</option>
+            </optgroup>
+            <optgroup label="🟢 Risiko Rendah">
+              <option value="uk">Inggris Raya</option><option value="usa">Amerika Serikat</option>
+              <option value="germany">Jerman</option><option value="netherlands">Belanda</option>
+              <option value="australia">Australia</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field"><label>Yurisdiksi Direktur</label>
+          <select id="ojur">
+            <option value="">— Pilih —</option>
+            <optgroup label="🔴 Risiko Tinggi">
+              <option value="bvi">British Virgin Islands</option><option value="cayman">Kepulauan Cayman</option>
+              <option value="seychelles">Seychelles</option><option value="samoa">Samoa</option><option value="panama">Panama</option>
+            </optgroup>
+            <optgroup label="🟡 Risiko Sedang">
+              <option value="singapore">Singapura</option><option value="hongkong">Hong Kong</option>
+              <option value="uae">UEA</option><option value="luxembourg">Luksemburg</option><option value="indonesia">Indonesia</option>
+            </optgroup>
+            <optgroup label="🟢 Risiko Rendah">
+              <option value="uk">Inggris Raya</option><option value="usa">Amerika Serikat</option>
+              <option value="germany">Jerman</option><option value="australia">Australia</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Jumlah Direktur / Pejabat</label><input type="number" id="ocnt" placeholder="cth. 2" min="1" max="200"/></div>
+        <div class="field"><label>Jumlah Entitas Terkait</label><input type="number" id="lent" placeholder="cth. 7" min="0" max="500"/></div>
+      </div>
+      <div class="field"><label>Kepemilikan Lintas Yurisdiksi</label>
+        <div class="tog-row">
+          <button class="tog on" id="cYes" onclick="setT('cross',true)">Ya — Berbeda</button>
+          <button class="tog" id="cNo" onclick="setT('cross',false)">Tidak — Sama</button>
+        </div>
+      </div>
+      <div class="field" style="margin-top:20px;">
+        <label>Direktur Pinjaman</label>
+        <p style="font-family:var(--sans);font-size:11.5px;color:var(--faint);line-height:1.65;margin:4px 0 8px;font-style:italic;">Seseorang yang dipinjam namanya oleh pemilik asli agar identitas pemilik sebenarnya tidak tercatat secara resmi.</p>
+        <div class="tog-row">
+          <button class="tog" id="nYes" onclick="setT('nom',true)">Ya</button>
+          <button class="tog on" id="nNo" onclick="setT('nom',false)">Tidak</button>
+        </div>
+      </div>
+      <div class="field"><label>Sektor Industri</label>
+        <select id="sec">
+          <option value="">— Pilih —</option>
+          <option value="holding">Perusahaan Holding</option><option value="finance">Jasa Keuangan</option>
+          <option value="property">Properti / Real Estat</option><option value="consulting">Konsultasi / Nasihat</option>
+          <option value="tech">Teknologi</option><option value="trade">Perdagangan / Impor-Ekspor</option>
+          <option value="manufacturing">Manufaktur</option><option value="retail">Ritel / Konsumen</option>
+        </select>
+      </div>
+      <!-- THIS BUTTON IS THE DARK MODE TRIGGER -->
+      <button class="run-btn" id="run-btn" onclick="runKYC()">Jalankan Analisis Forensik →</button>
+    </div>
+    <div class="result-panel">
+      <div id="rempty" class="r-empty">
+        <div class="r-empty-icon">◈</div>
+        <div class="r-empty-txt">Masukkan data perusahaan<br>untuk mengaktifkan<br>mesin forensik</div>
+      </div>
+      <div class="score-out" id="sout">
+        <div class="out-lbl">Probabilitas Shell Company</div>
+        <div class="out-num-wrap"><div class="out-num" id="onum">0</div><div class="out-pct">%</div></div>
+        <div class="out-bar-wrap"><div class="out-bar" id="obar"></div></div>
+        <div class="out-verdict" id="overd">
+          <div class="out-vdot" id="odot"></div>
+          <div><div class="out-vtitle" id="ovt"></div><div class="out-vsub" id="ovs"></div></div>
+        </div>
+        <div>
+          <div class="out-lbl" style="margin-bottom:12px;">Rincian Faktor Risiko</div>
+          <div class="breakdown" id="bkdn"></div>
+        </div>
+        <div>
+          <div class="out-lbl" style="margin-bottom:8px;">Sinyal Forensik</div>
+          <div id="fnote" style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7;"></div>
+        </div>
+        <div class="out-disc">⚠ Skor ini adalah model demonstrasi. Inferensi GNN nyata memerlukan server Neo4j dengan data ICIJ + UK Companies House lengkap dan bobot model terlatih.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="f-brand">Veritas Project</div>
+  <div class="f-meta">
+    Georgius Bintang Bagus Irianto &nbsp;·&nbsp; Sampoerna University / University of Arizona<br>
+    Proyek Capstone 2025 &nbsp;·&nbsp; Deteksi Shell Company Berbasis GNN
+  </div>
+</footer>
+
+<script>
+/* ════════════════════════════════════════
+   LOADING SCREEN
+════════════════════════════════════════ */
+(()=>{
+  const bar=document.getElementById('lbar'),st=document.getElementById('lstatus');
+  const msgs=['Memuat data jaringan...','Menginisialisasi mesin GNN...','Membangun peta relasi...','Sistem siap.'];
+  let pct=0;
+  const iv=setInterval(()=>{
+    pct+=Math.random()*26+10; if(pct>100)pct=100;
+    bar.style.width=pct+'%';
+    st.textContent=msgs[Math.min(Math.floor(pct/28),3)];
+    if(pct>=100){clearInterval(iv);setTimeout(()=>document.getElementById('ls').classList.add('out'),450);}
+  },300);
+})();
+
+/* ════════════════════════════════════════
+   MODEL COMPARISON BAR ANIMATION
+════════════════════════════════════════ */
+(()=>{
+  // Animate bars when hero enters view
+  function animateBars(){
+    document.querySelectorAll('.mc-bar-fill').forEach(el=>{
+      const t = el.style.getPropertyValue('--target');
+      el.style.width = t;
+    });
+    document.querySelectorAll('.mc-bar-good').forEach(el=>{
+      const t = el.style.getPropertyValue('--target');
+      el.style.width = t;
+    });
+  }
+  const io = new IntersectionObserver(([e])=>{
+    if(e.isIntersecting){ setTimeout(animateBars, 200); io.disconnect(); }
+  },{threshold:0.2});
+  const wrap = document.querySelector('.model-compare-wrap');
+  if(wrap) io.observe(wrap);
+})();
+
+/* ════════════════════════════════════════
+   GNN PIPELINE
+════════════════════════════════════════ */
+const STAGES=[
+  {tab:'1. Input Tabular',   desc:'Analis KYC dapat mengunggah data perusahaan dalam format spreadsheet biasa saat melakukan background check klien. Dashboard AI akan bekerja secara otomatis — pengguna tidak perlu membuat peta relasi atau graf jaringan secara manual.'},
+  {tab:'2. Pemetaan Graf',   desc:'Sistem secara otomatis membaca data spreadsheet dan mengubahnya menjadi peta jaringan. Setiap perusahaan, direktur, dan perantara menjadi titik (simpul), dan setiap hubungan kepemilikan menjadi garis penghubung. Koneksi yang melibatkan lebih dari satu negara diberi bobot lebih tinggi karena lebih berisiko.'},
+  {tab:'3. Lapisan GNN',     desc:'AI membaca peta jaringan tersebut dan memperhatikan konteks setiap entitas — bukan hanya datanya sendiri, tapi siapa saja yang terhubung dengannya. Mirip seperti mendeteksi komplotan: seseorang yang "bersih" bisa tetap mencurigakan jika semua relasinya adalah perusahaan bermasalah.'},
+  {tab:'4. Peta Kemiripan',  desc:'Setelah AI memproses seluruh jaringan, setiap entitas diwakili oleh sekumpulan angka yang menggambarkan karakteristiknya. Visualisasi ini menunjukkan bahwa shell company dari data ICIJ berkelompok terpisah jauh dari perusahaan legal — membuktikan AI berhasil membedakan keduanya.'},
+  {tab:'5. Keluaran Skor',   desc:'Setiap perusahaan dalam portofolio mendapatkan skor risiko 0–100%. Skor tinggi berarti pola jaringannya menyerupai shell company yang sudah terbukti. Analis KYC menggunakan skor ini untuk memutuskan siapa yang perlu diselidiki lebih dalam, dilaporkan, atau ditolak sebagai klien.'}
+];
+let gs=1;
+const stpr=document.getElementById('stpr');
+STAGES.forEach((s,i)=>{
+  const p=document.createElement('div');
+  p.className='pill'+(i===0?' active':'');
+  p.id='pill'+(i+1); p.textContent=s.tab;
+  p.onclick=()=>{gs=i+1;upGNN();};
+  stpr.appendChild(p);
+});
+function upGNN(){
+  for(let i=1;i<=5;i++){
+    document.getElementById('sp'+i).classList.toggle('active',i===gs);
+    const p=document.getElementById('pill'+i);
+    p.classList.remove('active','done');
+    if(i<gs)p.classList.add('done');
+    else if(i===gs)p.classList.add('active');
+  }
+  document.getElementById('gdesc').textContent=STAGES[gs-1].desc;
+  document.getElementById('pgnn').disabled=gs===1;
+  document.getElementById('ngnn').disabled=gs===5;
+}
+document.getElementById('pgnn').addEventListener('click',()=>{if(gs>1){gs--;upGNN();}});
+document.getElementById('ngnn').addEventListener('click',()=>{if(gs<5){gs++;upGNN();}});
+upGNN();
+
+/* Graph drawing — 3 node types with distinct colors */
+const NODES=[
+  {lines:['Meridian','Capital'],  x:14, y:28, t:'ent'},  // Entitas Korporat — merah tua
+  {lines:['A. Petrov'],           x:50, y:12, t:'off'},  // Pejabat/Pemilik — ungu
+  {lines:['Mossack','Fonseca'],   x:50, y:52, t:'int'},  // Perantara: firma hukum — teal
+  {lines:['Orion','Advisory'],    x:83, y:28, t:'ent'},  // Entitas Korporat
+  {lines:['Sunstone','Holdings'], x:83, y:72, t:'ent'},  // Entitas Korporat
+  {lines:['Li Wei','Chen'],       x:50, y:82, t:'off'},  // Pejabat/Pemilik
+];
+const NODE_COLORS={
+  ent:{bg:'#8b1a1a', glow:'rgba(139,26,26,.45)', pulse:'#c0392b'},  // merah tua = entitas korporat
+  off:{bg:'#7c3aed', glow:'rgba(124,58,237,.40)', pulse:'#2563eb'},  // ungu = pejabat/pemilik
+  int:{bg:'#0e7490', glow:'rgba(14,116,144,.40)', pulse:'#06b6d4'},  // teal = perantara
+};
+const EDGES=[[0,1],[0,2],[3,1],[3,2],[4,2],[4,5]];
+function drawG(id){
+  const c=document.getElementById(id); c.innerHTML='';
+  const isPulse=c.classList.contains('pulse-mode');
+
+  // Re-add legend after clearing
+  const leg=document.createElement('div'); leg.className='graph-legend';
+  leg.innerHTML=`
+    <div class="gl-item"><div class="gl-swatch" style="background:#8b1a1a"></div>Entitas Korporat</div>
+    <div class="gl-item"><div class="gl-swatch" style="background:#7c3aed"></div>Pejabat / Pemilik</div>
+    <div class="gl-item"><div class="gl-swatch" style="background:#0e7490"></div>Perantara</div>`;
+  c.appendChild(leg);
+
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;';
+  EDGES.forEach(([a,b])=>{
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',NODES[a].x+'%'); l.setAttribute('y1',NODES[a].y+'%');
+    l.setAttribute('x2',NODES[b].x+'%'); l.setAttribute('y2',NODES[b].y+'%');
+    // Color edges by node type involvement
+    const bothEntInt = (NODES[a].t==='ent'||NODES[a].t==='int') && (NODES[b].t==='ent'||NODES[b].t==='int');
+    const edgeColor = isPulse ? '#2563eb' : (bothEntInt ? '#8b1a1a' : '#aaaaaa');
+    const edgeOpacity = isPulse ? '0.7' : (bothEntInt ? '0.4' : '0.25');
+    l.setAttribute('stroke', edgeColor);
+    l.setAttribute('stroke-opacity', edgeOpacity);
+    l.setAttribute('stroke-width','1.5');
+    if(isPulse) l.setAttribute('stroke-dasharray','6 4');
+    svg.appendChild(l);
+  });
+  c.appendChild(svg);
+  NODES.forEach(n=>{
+    const w=document.createElement('div'); w.className='gnode';
+    w.style.left=n.x+'%'; w.style.top=n.y+'%';
+    const col=NODE_COLORS[n.t];
+    const sz=n.t==='ent'?86:n.t==='int'?74:78;
+    const circ=document.createElement('div');
+    circ.style.cssText=`
+      width:${sz}px;height:${sz}px;border-radius:50%;
+      background:${isPulse?col.pulse:col.bg};
+      box-shadow:0 2px 14px ${col.glow};
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      font-family:var(--mono);font-weight:500;color:#fff;
+      text-align:center;line-height:1.25;padding:6px;
+      transition:all .7s ease;
+    `;
+    if(n.lines.length===1){
+      circ.style.fontSize='10px';
+      circ.textContent=n.lines[0];
+    } else {
+      const l1=document.createElement('span');
+      l1.textContent=n.lines[0];
+      l1.style.cssText='display:block;font-size:10px;font-weight:600;line-height:1.2;';
+      const l2=document.createElement('span');
+      l2.textContent=n.lines[1];
+      l2.style.cssText='display:block;font-size:8px;font-weight:400;line-height:1.2;opacity:0.82;';
+      circ.appendChild(l1); circ.appendChild(l2);
+    }
+    w.appendChild(circ); c.appendChild(w);
+  });
+}
+drawG('ga1'); drawG('ga2');
+
+/* ════════════════════════════════════════
+   DARK MODE — triggers when user scrolls into #kyc section
+   Reverses when user scrolls back up to #pipeline
+════════════════════════════════════════ */
+let isDark = false;
+
+function setDark(on){
+  if(on===isDark) return;
+  isDark = on;
+  document.body.classList.toggle('is-dark', on);
+}
+
+// Trigger ON: #kyc enters viewport
+new IntersectionObserver(([e])=>{
+  if(e.isIntersecting) setDark(true);
+}, {threshold: 0.08}).observe(document.getElementById('kyc'));
+
+// Trigger OFF: #pipeline comes back into view (scroll up)
+new IntersectionObserver(([e])=>{
+  if(e.isIntersecting) setDark(false);
+}, {threshold: 0.10}).observe(document.getElementById('pipeline'));
+
+/* ════════════════════════════════════════
+   KYC LOGIC
+════════════════════════════════════════ */
+const TOG={cross:true,nom:false};
+function setT(k,v){
+  TOG[k]=v;
+  if(k==='cross'){document.getElementById('cYes').classList.toggle('on',v);document.getElementById('cNo').classList.toggle('on',!v);}
+  else{document.getElementById('nYes').classList.toggle('on',v);document.getElementById('nNo').classList.toggle('on',!v);}
+}
+const JR={
+  bvi:{f1:.91,f2:.88,f3:.85},cayman:{f1:.88,f2:.85,f3:.82},panama:{f1:.82,f2:.80,f3:.75},
+  seychelles:{f1:.85,f2:.80,f3:.78},samoa:{f1:.80,f2:.76,f3:.72},niue:{f1:.78,f2:.74,f3:.70},
+  cook:{f1:.79,f2:.75,f3:.71},aruba:{f1:.72,f2:.68,f3:.65},bermuda:{f1:.75,f2:.70,f3:.68},
+  bahamas:{f1:.73,f2:.69,f3:.66},cyprus:{f1:.68,f2:.65,f3:.60},mauritius:{f1:.65,f2:.62,f3:.58},
+  liechtenstein:{f1:.70,f2:.66,f3:.62},luxembourg:{f1:.55,f2:.52,f3:.45},malta:{f1:.50,f2:.48,f3:.42},
+  monaco:{f1:.52,f2:.50,f3:.44},jersey:{f1:.58,f2:.54,f3:.48},singapore:{f1:.45,f2:.42,f3:.35},
+  hongkong:{f1:.48,f2:.44,f3:.38},uae:{f1:.50,f2:.46,f3:.40},
+  uk:{f1:.10,f2:.08,f3:.06},usa:{f1:.12,f2:.10,f3:.08},germany:{f1:.08,f2:.06,f3:.05},
+  netherlands:{f1:.15,f2:.12,f3:.10},switzerland:{f1:.28,f2:.24,f3:.20},
+  australia:{f1:.09,f2:.07,f3:.06},indonesia:{f1:.20,f2:.18,f3:.22}
+};
+const sig=x=>1/(1+Math.exp(-x));
+function runKYC(){
+  const jur=document.getElementById('jur').value,ojur=document.getElementById('ojur').value;
+  if(!jur||!ojur){alert('Pilih kedua yurisdiksi untuk menjalankan analisis.');return;}
+  const nm=document.getElementById('cname').value.trim()||'Entitas Tidak Dikenal';
+  const officers=parseFloat(document.getElementById('ocnt').value)||1;
+  const linked=parseFloat(document.getElementById('lent').value)||0;
+  const sector=document.getElementById('sec').value;
+  const er=JR[jur]||{f1:.3,f2:.3,f3:.3},or_=JR[ojur]||{f1:.3,f2:.3,f3:.3};
+  const f1=(er.f1+or_.f1)/2,f2=(er.f2+or_.f2)/2,f3=(er.f3+or_.f3)/2;
+  const phi=jur!==ojur?1.25:1.0;
+  const offSig=Math.min(officers/5,1.0),hubSig=Math.min(linked/25,1.0);
+  const secR={holding:.3,finance:.18,property:.2,consulting:.15,tech:.05,trade:.1,manufacturing:.02,retail:.01}[sector]||0;
+  const nomS=TOG.nom?.25:0;
+  const logit=2.8*f1+2.2*f2+1.8*f3*phi+0.9*offSig+1.1*hubSig+1.4*secR+1.8*nomS+(TOG.cross?.6:0)-3.5;
+  const pct=Math.round(sig(logit)*100);
+  document.getElementById('rempty').style.display='none';
+  const out=document.getElementById('sout'); out.classList.add('show');
+  animN(document.getElementById('onum'),pct);
+  const bc=pct>=65?'#8b1a1a':pct>=35?'#92540a':'#14532d';
+  setTimeout(()=>{const b=document.getElementById('obar');b.style.width=pct+'%';b.style.background=bc;},80);
+  document.getElementById('onum').style.color=pct>=65?'#ef4444':pct>=35?'#f59e0b':'#22c55e';
+  let vc,vt,vs;
+  if(pct>=65){vc='#ef4444';vt='RISIKO TINGGI — Kemungkinan Shell Company';vs=`${nm} menunjukkan sinyal struktural kuat yang konsisten dengan entitas yang ditandai ICIJ. Rekomendasikan uji tuntas segera.`;}
+  else if(pct>=35){vc='#f59e0b';vt='RISIKO SEDANG — Perlu Tinjauan Lebih Lanjut';vs=`${nm} menunjukkan faktor risiko yang meningkat. Struktur lintas yurisdiksi dan profil sektor memerlukan penyelidikan lebih lanjut.`;}
+  else{vc='#22c55e';vt='RISIKO RENDAH — Tampak Legal';vs=`${nm} menunjukkan indikator kecurigaan rendah, konsisten dengan pola entitas legal di UK Companies House.`;}
+  document.getElementById('odot').style.background=vc;
+  const vd=document.getElementById('overd'); vd.style.borderLeftColor=vc; vd.style.background=vc+'14';
+  document.getElementById('ovt').textContent=vt; document.getElementById('ovs').textContent=vs;
+  const bks=[
+    {n:'Kerahasiaan Yurisdiksi (f1)',p:Math.round(f1*100),c:f1>.6?'#ef4444':f1>.35?'#f59e0b':'#22c55e'},
+    {n:'Fasilitasi Keuangan (f2)',p:Math.round(f2*100),c:f2>.6?'#ef4444':f2>.35?'#f59e0b':'#22c55e'},
+    {n:'Kelemahan Tata Kelola (f3×φ)',p:Math.round(f3*(phi/1.25)*100),c:f3>.5?'#ef4444':f3>.3?'#f59e0b':'#22c55e'},
+    {n:'Sinyal Hub Direktur',p:Math.round(offSig*100),c:offSig>.6?'#ef4444':'#f59e0b'},
+    {n:'Kepadatan Tautan Entitas',p:Math.round(hubSig*100),c:hubSig>.6?'#ef4444':'#22c55e'},
+    {n:'Sinyal Sektor + Nominee',p:Math.round(Math.min((secR+nomS)/.55,1)*100),c:nomS>0?'#ef4444':'#f59e0b'},
+  ];
+  const bd=document.getElementById('bkdn');
+  bd.innerHTML=bks.map(b=>`<div class="bk-row"><div class="bk-hd"><span class="bk-name">${b.n}</span><span class="bk-val">${b.p}%</span></div><div class="bk-bar-w"><div class="bk-bar" style="background:${b.c}" data-w="${b.p}"></div></div></div>`).join('');
+  setTimeout(()=>bd.querySelectorAll('.bk-bar').forEach(b=>b.style.width=b.dataset.w+'%'),200);
+  const notes=[];
+  if(jur!==ojur)notes.push(`Gesekan lintas yurisdiksi (φ=${phi}) terdeteksi: entitas di ${jur.toUpperCase()}, direktur di ${ojur.toUpperCase()}.`);
+  if(f1>.7)notes.push('Yurisdiksi berada di tingkat kerahasiaan teratas — konsisten dengan entitas Panama Papers & Offshore Leaks.');
+  if(nomS>0)notes.push('Tanda direktur nominee aktif. GNN memperlakukan ini sebagai sinyal positif untuk kebingungan yang disengaja.');
+  if(hubSig>.5)notes.push('Kepadatan tautan entitas tinggi. K-Barrier (maks 25 sisi) akan diberlakukan dalam inferensi produksi.');
+  if(!notes.length)notes.push('Tidak ada anomali struktural akut terdeteksi. Skor didorong oleh risiko yurisdiksi dasar.');
+  document.getElementById('fnote').textContent=notes.join(' ');
+}
+function animN(el,target,dur=1200){
+  const st=performance.now(),fr=parseInt(el.textContent)||0;
+  (function step(now){const t=Math.min((now-st)/dur,1),e=1-Math.pow(1-t,3);el.textContent=Math.round(fr+(target-fr)*e);if(t<1)requestAnimationFrame(step);})(performance.now());
+}
+
+/* ════════════════════════════════════════
+   SCROLL REVEAL
+════════════════════════════════════════ */
+const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in');}),{threshold:.07});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+/* ════════════════════════════════════════
+   MUSIC PLAYER
+════════════════════════════════════════ */
+const bgMusic = document.getElementById('bg-music');
+const musicBtn = document.getElementById('music-btn');
+let musicStarted = false;
+
+bgMusic.volume = 0.12;
+
+function toggleMusic(){
+  if(bgMusic.paused){
+    bgMusic.play().then(()=>{
+      musicStarted=true;
+      musicBtn.classList.add('playing');
+      document.getElementById('music-icon').textContent='♪';
+    }).catch(()=>{});
+  } else {
+    bgMusic.pause();
+    musicBtn.classList.remove('playing');
+    document.getElementById('music-icon').textContent='♩';
+  }
+}
+
+// Auto-play immediately on page load (browsers may block this,
+// so also try on first interaction as fallback)
+window.addEventListener('load', ()=>{
+  bgMusic.play().then(()=>{
+    musicStarted=true;
+    musicBtn.classList.add('playing');
+  }).catch(()=>{
+    // Browser blocked autoplay — start on first click anywhere
+    document.addEventListener('click', function startAudio(){
+      if(!musicStarted){
+        bgMusic.play().then(()=>{
+          musicStarted=true;
+          musicBtn.classList.add('playing');
+        }).catch(()=>{});
+      }
+      document.removeEventListener('click', startAudio);
+    }, {once:true});
+  });
+});
+
+(()=>{
+  const canvas=document.getElementById('net-canvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  let W,H,nodes;
+  const N=65, DIST=200, RED=0.20;
+
+  function resize(){
+    W=canvas.width=window.innerWidth;
+    H=canvas.height=window.innerHeight;
+  }
+
+  function makeNodes(){
+    nodes=Array.from({length:N},(_,i)=>{
+      const s=i<N*RED;
+      return{
+        x:Math.random()*W, y:Math.random()*H,
+        vx:(Math.random()-.5)*.38, vy:(Math.random()-.5)*.38,
+        r:s?4+Math.random()*4:2+Math.random()*3,
+        s, ph:Math.random()*Math.PI*2
+      };
+    });
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const dark=document.body.classList.contains('is-dark');
+    const ec=dark?'rgba(200,200,210,':'rgba(30,30,40,';
+    const rc=dark?'rgba(192,57,43,':'rgba(139,26,26,';
+    const rg=dark?'rgba(192,57,43,':'rgba(192,57,43,';
+
+    for(let i=0;i<N;i++) for(let j=i+1;j<N;j++){
+      const a=nodes[i],b=nodes[j];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d>DIST)continue;
+      const al=(1-d/DIST)*0.15;
+      if(a.s&&b.s){ctx.strokeStyle=rc+(al*2.2)+')';ctx.lineWidth=1.1;ctx.setLineDash([4,6]);}
+      else if(a.s||b.s){ctx.strokeStyle=rc+(al)+')';ctx.lineWidth=0.6;ctx.setLineDash([2,8]);}
+      else{ctx.strokeStyle=ec+al+')';ctx.lineWidth=0.5;ctx.setLineDash([]);}
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    const t=performance.now()/1000;
+    nodes.forEach(n=>{
+      const r=n.r*(1+Math.sin(t*1.3+n.ph)*.2);
+      if(n.s){
+        const g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3.5);
+        g.addColorStop(0,rg+'0.14)');g.addColorStop(1,rg+'0)');
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(n.x,n.y,r*3.5,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=rc+'0.80)';ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=rc+'0.30)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(n.x,n.y,r+3,0,Math.PI*2);ctx.stroke();
+      } else {
+        ctx.fillStyle=ec+'0.15)';ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);ctx.fill();
+      }
+      n.x+=n.vx;n.y+=n.vy;
+      if(n.x<0||n.x>W)n.vx*=-1;if(n.y<0||n.y>H)n.vy*=-1;
+      n.x=Math.max(0,Math.min(W,n.x));n.y=Math.max(0,Math.min(H,n.y));
+    });
+    requestAnimationFrame(draw);
+  }
+
+  resize();makeNodes();draw();
+  window.addEventListener('resize',()=>{resize();makeNodes();});
+})();
+</script>
+</body>
+</html>
