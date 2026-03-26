@@ -83,6 +83,7 @@ label, .form-intro, .r-empty-txt, .out-lbl,
 .ls-bar-wrap{width:240px;height:1px;background:rgba(255,255,255,.10);}
 .ls-bar{height:100%;width:0%;background:var(--red-mid);transition:width .32s ease;}
 .ls-status{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:rgba(255,255,255,.2);margin-top:14px;text-transform:uppercase;}
+@keyframes fadeInBtn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── NAV ── */
 nav {
@@ -473,7 +474,7 @@ body.is-dark footer{background:rgba(12,12,12,0.80);}
 </head>
 <body>
 
-<!-- LOADING -->
+<!-- LOADING / INTRO SCREEN -->
 <div id="ls">
   <div class="ls-logo">
     <div class="person-grid">
@@ -490,6 +491,20 @@ body.is-dark footer{background:rgba(12,12,12,0.80);}
   </div>
   <div class="ls-bar-wrap"><div class="ls-bar" id="lbar"></div></div>
   <div class="ls-status" id="lstatus">Memuat data jaringan...</div>
+  <!-- Enter button — shown after load, click starts music + dismisses screen -->
+  <button id="ls-enter" onclick="enterSite()" style="
+    display:none;margin-top:40px;
+    padding:13px 40px;background:transparent;
+    border:1px solid rgba(255,255,255,.35);
+    color:rgba(255,255,255,.7);
+    font-family:'DM Mono',monospace;font-size:11px;
+    letter-spacing:.28em;text-transform:uppercase;cursor:pointer;
+    transition:border-color .2s,color .2s;
+  "
+  onmouseover="this.style.borderColor='rgba(192,57,43,.7)';this.style.color='rgba(192,57,43,.9)'"
+  onmouseout="this.style.borderColor='rgba(255,255,255,.35)';this.style.color='rgba(255,255,255,.7)'">
+    Masuk →
+  </button>
 </div>
 
 <!-- NAV -->
@@ -850,7 +865,14 @@ body.is-dark footer{background:rgba(12,12,12,0.80);}
     pct+=Math.random()*26+10; if(pct>100)pct=100;
     bar.style.width=pct+'%';
     st.textContent=msgs[Math.min(Math.floor(pct/28),3)];
-    if(pct>=100){clearInterval(iv);setTimeout(()=>document.getElementById('ls').classList.add('out'),450);}
+    if(pct>=100){
+      clearInterval(iv);
+      // Show enter button instead of auto-dismissing — click = user interaction = music allowed
+      setTimeout(()=>{
+        const btn=document.getElementById('ls-enter');
+        if(btn){ btn.style.display='block'; btn.style.animation='fadeInBtn .6s ease forwards'; }
+      }, 300);
+    }
   },300);
 })();
 
@@ -1090,7 +1112,7 @@ const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.targ
 document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 
 /* ════════════════════════════════════════
-   MUSIC PLAYER
+   MUSIC PLAYER + ENTER SITE
 ════════════════════════════════════════ */
 const bgMusic = document.getElementById('bg-music');
 const musicBtn = document.getElementById('music-btn');
@@ -1098,39 +1120,33 @@ let musicStarted = false;
 
 bgMusic.volume = 0.12;
 
+// Called when user clicks "Masuk →" on the loading screen
+// This is a real user interaction → browser allows audio
+function enterSite(){
+  // Dismiss loading screen
+  document.getElementById('ls').classList.add('out');
+
+  // Start music — this click IS a user interaction so browser allows it
+  bgMusic.play().then(()=>{
+    musicStarted = true;
+    musicBtn.classList.add('playing');
+  }).catch(()=>{});
+}
+
+// Toggle button — pause/resume
 function toggleMusic(){
   if(bgMusic.paused){
     bgMusic.play().then(()=>{
-      musicStarted=true;
+      musicStarted = true;
       musicBtn.classList.add('playing');
-      document.getElementById('music-icon').textContent='♪';
+      document.getElementById('music-icon').textContent = '♪';
     }).catch(()=>{});
   } else {
     bgMusic.pause();
     musicBtn.classList.remove('playing');
-    document.getElementById('music-icon').textContent='♩';
+    document.getElementById('music-icon').textContent = '♩';
   }
 }
-
-// Auto-play immediately on page load (browsers may block this,
-// so also try on first interaction as fallback)
-window.addEventListener('load', ()=>{
-  bgMusic.play().then(()=>{
-    musicStarted=true;
-    musicBtn.classList.add('playing');
-  }).catch(()=>{
-    // Browser blocked autoplay — start on first click anywhere
-    document.addEventListener('click', function startAudio(){
-      if(!musicStarted){
-        bgMusic.play().then(()=>{
-          musicStarted=true;
-          musicBtn.classList.add('playing');
-        }).catch(()=>{});
-      }
-      document.removeEventListener('click', startAudio);
-    }, {once:true});
-  });
-});
 
 (()=>{
   const canvas=document.getElementById('net-canvas');
