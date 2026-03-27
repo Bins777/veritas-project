@@ -9,5 +9,5 @@ Untuk pengguna dan reviewer yang terhormat, selamat datang di github repository 
 
 P.S
 Take your time to enjoy and experience our dashboard!
-Thankyou and best of luck..
-Tim Veritas
+Thankyou and best of luck
+-Tim Veritas
