@@ -6,7 +6,7 @@ from graphdatascience import GraphDataScience
 #....PHASE 2: DATA ENGINE....
 
 # 1. Handshake with Neo4j
-gds = GraphDataScience("neo4j://127.0.0.1:7687", auth=("neo4j", "Vladivostok1."))
+gds = GraphDataScience("neo4j://127.0.0.1:7687", auth=("---", "---"))
 
 # 2. Load the External Authority (The CSV you created)
 # Ensure 'jurisdiction_risk.csv' is in the same folder as this script
