@@ -10,4 +10,4 @@ Untuk pengguna dan reviewer yang terhormat, selamat datang di github repository 
 P.S
 Take your time to enjoy and experience our website and dashboard!
 Thankyou and God bless
--Tim Veritas
+- Tim Veritas
