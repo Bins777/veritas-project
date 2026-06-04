@@ -8,6 +8,6 @@ Untuk pengguna dan reviewer yang terhormat, selamat datang di github repository 
 - Website utama kami dapat diakses di https://veritas-compliance.tech/
 
 P.S
-Take your time to enjoy and experience our dashboard!
-Thankyou and best of luck
+Take your time to enjoy and experience our website and dashboard!
+Thankyou and God bless
 -Tim Veritas
