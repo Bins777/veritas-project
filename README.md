@@ -6,6 +6,7 @@ Untuk pengguna dan reviewer yang terhormat, selamat datang di github repository 
 - Kami hanya mengupload dasar model GNN kami tanpa sambungan ke API dataset kami.
 - Dataset kami dapat kami berikan on-request oleh reviewer DIGDAYA.
 - Website utama kami dapat diakses di https://veritas-compliance.tech/
+- Dashboard utama kami dapat diakses di https://app.veritas-compliance.tech/
 
 P.S
 Take your time to enjoy and experience our website and dashboard!
